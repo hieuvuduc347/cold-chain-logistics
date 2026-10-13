@@ -4,12 +4,14 @@
 std::string getCurrentTime();
 
 struct SensorData {
-    std::string Sensor_ID;
-    std::string Product_name;
-    std::string Sensor_type;
-    double value;
+    std::string sensorId;
+    double temperature;
     std::string timestamp;
 
-    // Dong goi JSON
-    std::string toJson();
+    // Xuất chuỗi thô chuẩn vi điều khiển: "SENSOR-01,5.2" hoặc "SENSOR-01,5.2,TIMESTAMP"
+    std::string toRawString() const;
+    std::string toRawStringWithTime() const;
+
+    // Đóng gói JSON thô (nếu cần log)
+    std::string toJson() const;
 };

@@ -2,13 +2,14 @@
 #include <string>
 #include "SensorData.h"
 
-class Sensor { // Ham cha
-    protected:
-        std::string ID;
-        std::string Product_name;
-    public:
-        Sensor (std::string Sensor_ID, std::string Product_name);
-        virtual ~Sensor() = default;
+class Sensor {
+protected:
+    std::string id;
 
-        virtual SensorData readData() = 0; // tao ham data de cac chuong trinh con tu dnh nghia
+public:
+    explicit Sensor(std::string sensorId);
+    virtual ~Sensor() = default;
+
+    const std::string& getId() const;
+    virtual SensorData readData() = 0;
 };

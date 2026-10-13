@@ -1,0 +1,18 @@
+# Compiled binaries and libraries
+*.exe
+*.o
+*.obj
+*.dll
+*.so
+*.a
+
+# Build directories
+build/
+bin/
+out/
+
+# IDE / Editor configs
+.vscode/
+.idea/
+*.swp
+*.DS_Store

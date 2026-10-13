@@ -1,7 +1,8 @@
 #include "../include/Sensor.h"
-#include <string>
+#include <utility>
 
-Sensor::Sensor(std::string Sensor_ID, std::string Product_name) {
-    this -> ID = Sensor_ID;
-    this -> Product_name = Product_name;
+Sensor::Sensor(std::string sensorId) : id(std::move(sensorId)) {}
+
+const std::string& Sensor::getId() const {
+    return id;
 }

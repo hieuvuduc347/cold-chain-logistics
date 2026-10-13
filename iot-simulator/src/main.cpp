@@ -1,59 +1,117 @@
 #include <iostream>
+#include <memory>
 #include <string>
-#include <vector>
 #include <thread>
 #include <chrono>
-#include "../include/HumiditySensor.h"
-#include "../include/TemperatureSensor.h"
 
+#include "../../backend-core/domain/iot/ISensorReadingHandler.h"
+#include "../../backend-core/domain/iot/SensorDevice.h"
+#include "../include/SensorGateway.h"
+#include "../include/SensorSimulator.h"
+
+// Mock Handler đại diện cho Phân hệ Shipment của TV1
+class ShipmentReadingReceiver : public Domain::IoT::ISensorReadingHandler {
+private:
+    int violationCount = 0;
+    const double MAX_THRESHOLD = 8.0;
+    const int CRITICAL_LIMIT = 3;
+
+public:
+    void onReading(const Domain::IoT::TemperatureReading& reading) override {
+        std::cout << "  -> [TV1-Shipment Receiver] Nhan du lieu: Sensor = " << reading.getSensorId()
+                  << " | Nhiet do = " << reading.getCelsius() << " C"
+                  << " | Thoi gian = " << reading.getTimestamp() << "\n";
+
+        // Nghiệp vụ TV1 kiểm tra điều kiện bảo quản chuỗi lạnh
+        if (reading.getCelsius() > MAX_THRESHOLD) {
+            violationCount++;
+            std::cout << "     [! CANH BAO TV1] Nhiet do vuot nguong an toan (" 
+                      << MAX_THRESHOLD << " C)! So lan vi pham lien tiep: " << violationCount << "\n";
+
+            if (violationCount >= CRITICAL_LIMIT) {
+                std::cout << "     [!!! NGUY HIEM TV1] VI PHAM QUA " << CRITICAL_LIMIT 
+                          << " LAN -> KICH HOAT LENH HUY LO HANG TRONG CONTAINER!\n";
+            }
+        } else {
+            if (violationCount > 0) {
+                std::cout << "     [✓ HOI PHUC TV1] Nhiet do da tro ve dải an toan. Reset bo dem vi pham.\n";
+                violationCount = 0;
+            }
+        }
+    }
+};
 
 int main() {
-    // Nhap so luong thung hang
-    std::cout << "\n---HE THONG QUAN LY CHUOI CUNG UNG LANH---\n";
-    std::cout << "Nhap so luong thung hang can giam sat: ";
-    int n;
-    std::cin >> n;
-    std::cin.ignore();
+    std::cout << "======================================================================\n";
+    std::cout << "   HE THONG CHUOI CUNG UNG LANH (COLD CHAIN LOGISTICS) - NHOM 8       \n";
+    std::cout << "   PHAN HE SENSING & IOT (TV2) - REFACTOR CHUAN DDD & MULTI-THREADING \n";
+    std::cout << "======================================================================\n\n";
 
-    // Tao mang dong chua du lieu
-    std::vector<HumiditySensor*> HumSensors;
-    std::vector<TemperatureSensor*> TemSensors;
+    // 1. Khởi tạo Domain Entity SensorDevice
+    Domain::IoT::SensorDevice containerSensor("SENSOR-COLD-01", "CONTAINER-HCM-01");
+    std::cout << "[Domain] Khoi tao SensorDevice Entity:\n";
+    std::cout << "  - Sensor ID   : " << containerSensor.getSensorId() << "\n";
+    std::cout << "  - Container ID: " << containerSensor.getContainerId() << "\n";
+    std::cout << "  - Trang thai  : " << containerSensor.getStatusString() << "\n\n";
 
+    // 2. Khởi tạo Gateway (Anti-Corruption Layer) và đăng ký Handler TV1
+    auto gateway = std::make_shared<SensorGateway>();
+    auto tv1Handler = std::make_shared<ShipmentReadingReceiver>();
+    gateway->registerHandler(tv1Handler);
+    gateway->registerDevice(containerSensor.getSensorId(), containerSensor.getContainerId());
+    std::cout << "[Gateway-ACL] Da dang ky SensorGateway va ket noi ISensorReadingHandler (TV1).\n\n";
 
-    // Nhap du lieu cho tung thung hang
-    for (int i=0; i<n; i++) {
-        std::string input_id;
-        std::string input_name;
+    // 3. Khởi tạo Simulator (chu kỳ 1000ms)
+    auto simulator = std::make_unique<SensorSimulator>(gateway, 1000);
+    simulator->addSensor(containerSensor.getSensorId());
 
-        std::cout << "---Thung hang thu " << i+1 << "---\n";
+    // 4. Menu lựa chọn kịch bản
+    std::cout << "CHON KICH BAN MO PHONG CAM BIEN (14/10 - 20/10):\n";
+    std::cout << "  1. STABLE: On dinh trong dai an toan (2.5C - 4.8C)\n";
+    std::cout << "  2. DRIFT : Hong thung / That thoat nhiet (Nhiet do tang dan deu)\n";
+    std::cout << "  3. SPIKE : Dot bien nhiet tuc thoi (Vuot nguong warning roi tu hoi phuc)\n";
+    std::cout << "  4. NOISE : Nhieu ngau nhien bien do rong (Cac dao dong nhiet bat thuong)\n";
+    std::cout << "Nhap lua chon (1-4) [Mac dinh 1]: ";
 
-        std::cout << "Ma thung hang: ";
-        getline(std::cin, input_id);
-
-        std::cout << "Ten san pham: ";
-        getline(std::cin, input_name);
-
-        // Them du lieu vao mang
-        HumSensors.push_back(new HumiditySensor(input_id, input_name));
-        TemSensors.push_back(new TemperatureSensor(input_id, input_name));
-    }
- 
-    // Doc cam bien va ghi du lieuz
-    std::cout << "\n===BAT DAU DOC CAM BIEN CHO" << n << " THUNG HANG===\n";
-    while (true) {
-        for (int i=0; i<n; i++) {
-            SensorData temData = TemSensors[i] -> readData();
-            SensorData humData = HumSensors[i] -> readData();
-
-            // in du lieu
-            std::cout << temData.toJson() << "\n";
-            std::cout << humData.toJson() << "\n";
-        }
-        
-        std::cout << "------------------------------------------";
-        // Cu 10s doc cam bien 1 lan
-        std::this_thread::sleep_for(std::chrono::seconds(10));
+    int choice = 1;
+    if (!(std::cin >> choice)) {
+        choice = 1;
     }
 
+    switch (choice) {
+        case 2:
+            simulator->setMode(SimulationMode::DRIFT);
+            break;
+        case 3:
+            simulator->setMode(SimulationMode::SPIKE);
+            break;
+        case 4:
+            simulator->setMode(SimulationMode::NOISE);
+            break;
+        default:
+            simulator->setMode(SimulationMode::STABLE);
+            break;
+    }
+
+    std::cout << "\n--> Che do dang chay: " << simulator->getModeString() << "\n";
+    std::cout << "--> Bat dau luong nen std::thread... (Mo phong phat 5 chu ky du lieu mau)\n\n";
+
+    simulator->start();
+
+    // Chay mo phong trong 5.2 giay (tuong duong 5 chu ky do)
+    std::this_thread::sleep_for(std::chrono::milliseconds(5200));
+
+    std::cout << "\n[Simulator] Dang dung luong an toan (workerThread.join())...\n";
+    simulator->stop();
+    std::cout << "[Simulator] Da dung luong thanh cong.\n";
+
+    // Thử nghiệm kiểm tra Timeout OFFLINE sau khi dừng
+    std::cout << "\n[Heartbeat Check] Kiem tra timeout mat ket noi sau khi ngung phat du lieu:\n";
+    std::cout << "  Trang thai hien tai: " << gateway->getDeviceStatusString(containerSensor.getSensorId()) << "\n";
+    std::cout << "  Gia lap he thong kiem tra sau 3 giay khong co tin hieu...\n";
+    gateway->checkDeviceTimeouts(0); // Timeout ngay vì luồng đã dừng
+    std::cout << "  Trang thai sau kiem tra: " << gateway->getDeviceStatusString(containerSensor.getSensorId()) << "\n";
+
+    std::cout << "\n=== CHUONG TRINH HOAN TAT AN TOAN ===\n";
     return 0;
 }

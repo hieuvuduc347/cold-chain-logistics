@@ -1,18 +1,23 @@
 #include "../include/TemperatureSensor.h"
-#include <ctime>
-TemperatureSensor::TemperatureSensor(std::string Sensor_ID, std::string Product_name)
-    : Sensor(Sensor_ID, Product_name),
-    gen(time(0)), dist(2.0, 12.0)
-    {}
+#include <chrono>
 
-// Dinh nghia ham doc du lieu
+TemperatureSensor::TemperatureSensor(std::string sensorId, double minRange, double maxRange)
+    : Sensor(std::move(sensorId)),
+      gen(static_cast<unsigned int>(std::chrono::system_clock::now().time_since_epoch().count())),
+      dist(minRange, maxRange) {}
+
 SensorData TemperatureSensor::readData() {
     SensorData data;
-    data.Sensor_ID = this -> ID;
-    data.Product_name = this -> Product_name;
-    data.Sensor_type = "Temperature";
-    data.value = dist(gen);
+    data.sensorId = this->id;
+    data.temperature = dist(gen);
     data.timestamp = getCurrentTime();
+    return data;
+}
 
+SensorData TemperatureSensor::readValue(double specificTemp) {
+    SensorData data;
+    data.sensorId = this->id;
+    data.temperature = specificTemp;
+    data.timestamp = getCurrentTime();
     return data;
 }
